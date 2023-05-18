@@ -51,12 +51,15 @@ public abstract class PostgisReader implements DataReader {
         graphStorage.create(1000);
         processJunctions();
         processRoads();
+        processRestrictions();
         finishReading();
     }
 
     abstract void processJunctions();
 
     abstract void processRoads();
+    
+    abstract void processRestrictions();
 
     /**
      * This method will be called in the end to release the objects
