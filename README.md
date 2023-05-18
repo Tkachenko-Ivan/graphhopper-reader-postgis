@@ -32,7 +32,7 @@ graphHopperConfig.putObject("db.tags_to_copy", "name");
 graphHopperConfig.putObject("datareader.file", "roads_view");
 ```
 
-Здесь `roads_view` - это таблица или представление с дрогами.
+Здесь `roads_view` - это таблица или представление с дорогами.
 
 Укажите директорию, в которую будет сохранятся построенный граф дорог:
 
