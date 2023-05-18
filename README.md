@@ -12,7 +12,7 @@
 Этот репозиторий - fork репозитория [mbasa/graphhopper-reader-postgis](https://github.com/mbasa/graphhopper-reader-postgis), однако он не сделан как fork, а склонирован и выложен заново как отдельный репозиторий. 
 
 Сделанно это сознательно, т.к. я внёс в него некоторые изменения, так сказать, "для себя", которые я не планирую контрибьютить в базовый репозиторий, 
-а вот второй форк, вот он: [Tkachenko-Ivan/graphhopper-reader-postgis-fork]([Tkachenko-Ivan/graphhopper-reader-postgis-fork](https://github.com/Tkachenko-Ivan/graphhopper-reader-postgis-fork)), в него я как раз планирую добавлять изменения для создания Pull Request.
+а вот второй форк, вот он: [Tkachenko-Ivan/graphhopper-reader-postgis-fork](https://github.com/Tkachenko-Ivan/graphhopper-reader-postgis-fork), в него я как раз планирую добавлять изменения для создания Pull Request.
 К сожалению создавать два форка на одном аккаунте github нельзя, и создавать второй аккаунт я не хочу, поэтому пошёл на такие ухищрения.
 
 # Работа с примером
