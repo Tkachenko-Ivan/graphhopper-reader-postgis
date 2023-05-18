@@ -1,9 +1,5 @@
 package com.graphhopper;
 
-import com.graphhopper.GHRequest;
-import com.graphhopper.GHResponse;
-import com.graphhopper.GraphHopper;
-import com.graphhopper.GraphHopperConfig;
 import com.graphhopper.config.Profile;
 import com.graphhopper.routing.util.CarFlagEncoder;
 import com.graphhopper.routing.util.EncodingManager;
@@ -11,7 +7,7 @@ import com.graphhopper.util.shapes.GHPoint;
 import java.util.Collections;
 import com.graphhopper.reader.postgis.GraphHopperPostgis;
 
-public class Main {
+public class Worker {
 
     private static final String dir = "D:\\Test\\graph";
 
@@ -42,6 +38,7 @@ public class Main {
         request.addPoint(new GHPoint(54.42792, 19.88905));
         request.addPoint(new GHPoint(54.43032, 19.892));
         request.setProfile("my_car");
+        
         GHResponse response = graphHopper.route(request);
     }
 

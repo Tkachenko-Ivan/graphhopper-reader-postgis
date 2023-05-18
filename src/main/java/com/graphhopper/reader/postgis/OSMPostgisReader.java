@@ -42,7 +42,7 @@ public class OSMPostgisReader extends PostgisReader {
     private static final int FIRST_NODE_ID = 1;
     private final String[] tagsToCopy;
     private File roadsFile;
-    private GHObjectIntHashMap<Coordinate> coordState = new GHObjectIntHashMap<>(1000, 0.7f);
+    private GHObjectIntHashMap<Coordinate> coordState = new GHObjectIntHashMap<>(10_000_000, 0.7f);
     private final DistanceCalc distCalc = DIST_EARTH;
     private final HashSet<EdgeAddedListener> edgeAddedListeners = new HashSet<>();
     private int nextNodeId = FIRST_NODE_ID;
