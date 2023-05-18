@@ -23,9 +23,10 @@ public class Worker {
         graphHopperConfig.putObject("db.schema", "public");
         graphHopperConfig.putObject("db.user", "postgres");
         graphHopperConfig.putObject("db.passwd", "RoutePass");
+        
         graphHopperConfig.putObject("db.tags_to_copy", "name");
-
         graphHopperConfig.putObject("datareader.file", "roads_view");
+        
         graphHopperConfig.putObject("graph.location", dir);
         graphHopperConfig.putObject("graph.flag_encoders", "car");
 
@@ -35,11 +36,12 @@ public class Worker {
         graphHopper.importOrLoad();
 
         GHRequest request = new GHRequest();
-        request.addPoint(new GHPoint(54.42792, 19.88905));
-        request.addPoint(new GHPoint(54.43032, 19.892));
+        request.addPoint(new GHPoint(54.716345, 20.462178));
+        request.addPoint(new GHPoint(54.720459, 20.484996));
         request.setProfile("my_car");
         
         GHResponse response = graphHopper.route(request);
+        System.out.println(response.getHints());
     }
 
 }

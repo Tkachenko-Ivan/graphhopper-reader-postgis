@@ -9,6 +9,7 @@ import com.graphhopper.storage.NodeAccess;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.LineString;
 import com.vividsolutions.jts.geom.MultiLineString;
+import java.io.IOException;
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
 import org.geotools.data.FeatureSource;
@@ -81,20 +82,25 @@ public abstract class PostgisReader implements DataReader {
             FeatureIterator<SimpleFeature> features = collection.features();
             return features;
 
-        } catch (Exception e) {
+        } catch (IOException e) {
             throw Utils.asUnchecked(e);
         }
     }
 
     /**
      * Filters can help a lot when you need to limit the results returned from
-     * PostGIS. A Filter can be used similar to the WHERE clause in regular SQL
+     * PostGIS.
+     *
+     * A Filter can be used similar to the WHERE clause in regular SQL
      * statements. It's easy to filter geometries that have a certain
      * attributes, are in certain BBoxes, Polygons, etc. You can find a lot of
      * sample filters here:
      * https://github.com/geotools/geotools/blob/master/docs/src/main/java/org/geotools/main/FilterExamples.java
      * <p>
      * By default, all features are returned.
+     * 
+     * @param source
+     * @return
      */
     protected Filter getFilter(FeatureSource source) {
         return Filter.INCLUDE;
@@ -108,16 +114,16 @@ public abstract class PostgisReader implements DataReader {
                 throw new IllegalArgumentException("Error Connecting to Database ");
             }
             return ds;
-
-        } catch (Exception e) {
+        } catch (IOException e) {
             throw Utils.asUnchecked(e);
         }
     }
 
     /**
-     * This method can be used to filter features. One way to use it is to
-     * filter for features withing a certain BBox
+     * This method can be used to filter features.One way to use it is to filter
+     * for features withing a certain BBox
      *
+     * @param feature
      * @return true if the feature should be accepted
      */
     protected boolean acceptFeature(SimpleFeature feature) {
@@ -138,7 +144,8 @@ public abstract class PostgisReader implements DataReader {
         }
 
         if (coords instanceof LineString) {
-            ret.add(((LineString) coords).getCoordinates());
+            LineString ls = (LineString) coords;
+            ret.add(ls.getCoordinates());
         } else if (coords instanceof MultiLineString) {
             MultiLineString mls = (MultiLineString) coords;
             int n = mls.getNumGeometries();

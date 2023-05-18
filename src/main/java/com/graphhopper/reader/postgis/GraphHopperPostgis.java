@@ -12,6 +12,7 @@ import java.util.Map;
 public class GraphHopperPostgis extends GraphHopperOSM {
 
     private final HashSet<OSMPostgisReader.EdgeAddedListener> edgeAddedListeners = new HashSet<>();
+    
     private final Map<String, String> postgisParams = new HashMap<>();
 
     @Override

@@ -4,7 +4,6 @@ import com.graphhopper.coll.GHObjectIntHashMap;
 import com.graphhopper.reader.DataReader;
 import com.graphhopper.reader.ReaderWay;
 import com.graphhopper.reader.dem.ElevationProvider;
-import com.graphhopper.routing.util.CarFlagEncoder;
 import com.graphhopper.routing.util.EncodingManager;
 import com.graphhopper.storage.GraphHopperStorage;
 import com.graphhopper.storage.IntsRef;
@@ -40,17 +39,25 @@ public class OSMPostgisReader extends PostgisReader {
     private static final int COORD_STATE_UNKNOWN = 0;
     private static final int COORD_STATE_PILLAR = -2;
     private static final int FIRST_NODE_ID = 1;
+
+    private GHObjectIntHashMap<Coordinate> coordState = new GHObjectIntHashMap<>(10_000_000, 0.7f);
+    private final HashSet<EdgeAddedListener> edgeAddedListeners = new HashSet<>();
+
+    private int nextNodeId = FIRST_NODE_ID;
+
     private final String[] tagsToCopy;
     private File roadsFile;
-    private GHObjectIntHashMap<Coordinate> coordState = new GHObjectIntHashMap<>(10_000_000, 0.7f);
     private final DistanceCalc distCalc = DIST_EARTH;
-    private final HashSet<EdgeAddedListener> edgeAddedListeners = new HashSet<>();
-    private int nextNodeId = FIRST_NODE_ID;
     protected long zeroCounter = 0;
+
     private final IntsRef tempRelFlags;
+
+    private final HashMap<Long, WayNodes> wayNodesMap = new HashMap<>();
+    private final HashMap<Integer, Long> edgeOsmIdMap = new HashMap<>();
 
     public OSMPostgisReader(GraphHopperStorage ghStorage, Map<String, String> postgisParams) {
         super(ghStorage, postgisParams);
+
         String tmpTagsToCopy = postgisParams.get("tags_to_copy");
         if (tmpTagsToCopy == null || tmpTagsToCopy.isEmpty()) {
             this.tagsToCopy = new String[]{};
@@ -58,9 +65,9 @@ public class OSMPostgisReader extends PostgisReader {
             this.tagsToCopy = tmpTagsToCopy.split(",");
         }
         tempRelFlags = encodingManager.createRelationFlags();
-        if (tempRelFlags.length != 2)
+        if (tempRelFlags.length != 2) {
             throw new IllegalArgumentException("Cannot use relation flags with != 2 integers");
-        // TODO relations are set empty by default, add relation handling
+        }
         tempRelFlags.ints[0] = (int) 0L;
         tempRelFlags.ints[1] = (int) 0L;
     }
@@ -89,28 +96,29 @@ public class OSMPostgisReader extends PostgisReader {
                         Coordinate c = points[i];
                         c = roundCoordinate(c);
 
-                        // don't add the same coord twice for the same edge - happens with bad geometry, i.e.
-                        // duplicate coords or a road which forms a circle (e.g. roundabout)
-                        if (tmpSet.contains(c))
+                        // Не добавлять одну и ту же координату дважды для одного ребра - 
+                        // происходит с плохой геометрией, 
+                        // т.е. дублирующимися координатами, 
+                        // или дорогой которая образует круг (например, кольцевая развязка)
+                        if (tmpSet.contains(c)) {
                             continue;
+                        }
 
                         tmpSet.add(c);
 
-                        // skip if its already a node
+                        // Пропустить если это уже узел
                         int state = coordState.get(c);
                         if (state >= FIRST_NODE_ID) {
                             continue;
                         }
 
                         if (i == 0 || i == points.length - 1 || state == COORD_STATE_PILLAR) {
-                            // turn into a node if its the first or last
-                            // point, or already appeared in another edge
+                            // Превратится в УЗЕЛ если это первая или последняя точка, или появлялась в другом ребре
                             int nodeId = nextNodeId++;
                             coordState.put(c, nodeId);
                             saveTowerPosition(nodeId, c);
                         } else if (state == COORD_STATE_UNKNOWN) {
-                            // mark it as a pillar (which may get upgraded
-                            // to an edge later)
+                            // Пометить в качество столба, (который затем может быть превращён в узел)
                             coordState.put(c, COORD_STATE_PILLAR);
                         }
 
@@ -130,15 +138,15 @@ public class OSMPostgisReader extends PostgisReader {
             }
         }
 
-        if (nextNodeId == FIRST_NODE_ID)
+        if (nextNodeId == FIRST_NODE_ID) {
             throw new IllegalArgumentException("No data found for roads file " + roadsFile);
+        }
 
         LOGGER.info("Number of junction points : " + (nextNodeId - FIRST_NODE_ID));
     }
 
     @Override
     void processRoads() {
-
         DataStore dataStore = null;
         FeatureIterator<SimpleFeature> roads = null;
 
@@ -156,11 +164,10 @@ public class OSMPostgisReader extends PostgisReader {
                 }
 
                 for (Coordinate[] points : getCoords(road)) {
-                    // Parse all points in the geometry, splitting into
-                    // individual GraphHopper edges
-                    // whenever we find a node in the list of points
+                    // Парсим все точки в геометрии, разделяя их на отдельные рёбра
+                    // всякий раз когда находим узел в списке точек
                     Coordinate startTowerPnt = null;
-                    List<Coordinate> pillars = new ArrayList<Coordinate>();
+                    List<Coordinate> pillars = new ArrayList<>();
                     for (Coordinate point : points) {
                         point = roundCoordinate(point);
                         if (startTowerPnt == null) {
@@ -171,7 +178,7 @@ public class OSMPostgisReader extends PostgisReader {
                                 int fromTowerNodeId = coordState.get(startTowerPnt);
                                 int toTowerNodeId = state;
 
-                                // get distance and estimated centre
+                                // Получить расстояние и приблизительный центр
                                 GHPoint estmCentre = new GHPoint(
                                         0.5 * (lat(startTowerPnt) + lat(point)),
                                         0.5 * (lng(startTowerPnt) + lng(point)));
@@ -182,8 +189,7 @@ public class OSMPostgisReader extends PostgisReader {
                                 }
 
                                 double distance = getWayLength(startTowerPnt, pillars, point);
-                                addEdge(fromTowerNodeId, toTowerNodeId, road, distance, estmCentre,
-                                        pillarNodes);
+                                addEdge(fromTowerNodeId, toTowerNodeId, road, distance, estmCentre, pillarNodes);
                                 startTowerPnt = point;
                                 pillars.clear();
 
@@ -216,6 +222,14 @@ public class OSMPostgisReader extends PostgisReader {
         LOGGER.info("Finished reading. Zero Counter " + nf(zeroCounter) + " " + Helper.getMemInfo());
     }
 
+    /**
+     * Рассчёт расстояния по координатам
+     *
+     * @param start начальная точка
+     * @param pillars промежуточные точки
+     * @param end конечная точка
+     * @return дистанция
+     */
     protected double getWayLength(Coordinate start, List<Coordinate> pillars, Coordinate end) {
         double distance = 0;
 
@@ -249,37 +263,31 @@ public class OSMPostgisReader extends PostgisReader {
 
     @Override
     public DataReader setElevationProvider(ElevationProvider ep) {
-        // Elevation not supported
         return this;
     }
 
     @Override
     public DataReader setWorkerThreads(int workerThreads) {
-        // Its only single-threaded
         return this;
     }
 
     @Override
     public DataReader setWayPointMaxDistance(double wayPointMaxDistance) {
-        // Currently not supported
         return this;
     }
 
     @Override
     public DataReader setWayPointElevationMaxDistance(double v) {
-        // Currently not supported
         return this;
     }
 
     @Override
     public DataReader setSmoothElevation(boolean smoothElevation) {
-        // TODO implement elevation smoothing for shape files
         return this;
     }
 
     @Override
     public DataReader setLongEdgeSamplingDistance(double v) {
-        // Currently not supported
         return this;
     }
 
@@ -289,15 +297,21 @@ public class OSMPostgisReader extends PostgisReader {
     }
 
     public static interface EdgeAddedListener {
+
         void edgeAdded(ReaderWay way, EdgeIteratorState edge);
     }
 
     private void addEdge(int fromTower, int toTower, SimpleFeature road, double distance,
-                         GHPoint estmCentre, PointList pillarNodes) {
+            GHPoint estmCentre, PointList pillarNodes) {
         EdgeIteratorState edge = graph.edge(fromTower, toTower);
 
-        // read the OSM id, should never be null
+        // Идентификатор OSM, он никогда не должен быть null
         long id = getOSMId(road);
+
+        // saving from.to nodes for restrictions and edgeId
+        WayNodes wayNode = new WayNodes(fromTower, toTower);
+        edgeOsmIdMap.put(edge.getEdge(), id);
+        wayNodesMap.put(id, wayNode);
 
         // Make a temporary ReaderWay object with the properties we need so we
         // can use the enocding manager
@@ -309,14 +323,13 @@ public class OSMPostgisReader extends PostgisReader {
         way.setTag("estimated_distance", distance);
         way.setTag("estimated_center", estmCentre);
 
-        // read the highway type
+        // Тип дороги
         Object type = road.getAttribute("fclass");
         if (type != null) {
             way.setTag("highway", type.toString());
         }
 
-        // read maxspeed filtering for 0 which for Geofabrik shapefiles appears
-        // to correspond to no tag
+        // Максимальная скорость
         Object maxSpeed = road.getAttribute("maxspeed");
         if (maxSpeed != null && !maxSpeed.toString().trim().equals("0")) {
             way.setTag("maxspeed", maxSpeed.toString());
@@ -329,7 +342,7 @@ public class OSMPostgisReader extends PostgisReader {
             }
         }
 
-        // read oneway
+        // Односторонее движение
         Object oneway = road.getAttribute("oneway");
         if (oneway != null) {
             // Geofabrik is using an odd convention for oneway field in
@@ -338,13 +351,13 @@ public class OSMPostgisReader extends PostgisReader {
             // with correctly by the flag encoder.
             String val = toLowerCase(oneway.toString().trim());
             if (val.equals("b") || val.equals("no")) {
-                // both ways
+                // в обоих направлениях
                 val = "no";
             } else if (val.equals("t") || val.equals("-1")) {
-                // one way against the direction of digitisation
+                // односторонее: "Обратно направлению оцифровки"
                 val = "-1";
             } else if (val.equals("f") || val.equals("yes")) {
-                // one way Forward in the direction of digitisation
+                // односторонее: "Вперёд в направлении оцифровки"
                 val = "yes";
             } else {
                 val = "no";
@@ -353,15 +366,16 @@ public class OSMPostgisReader extends PostgisReader {
             way.setTag("oneway", val);
         }
 
-        // Process the flags using the encoders
+        // Проверка доступности в Encoder
         EncodingManager.AcceptWay acceptWay = new EncodingManager.AcceptWay();
         if (!encodingManager.acceptWay(way, acceptWay)) {
             return;
         }
 
         IntsRef edgeFlags = encodingManager.handleWayTags(way, acceptWay, tempRelFlags);
-        if (edgeFlags.isEmpty())
+        if (edgeFlags.isEmpty()) {
             return;
+        }
 
         edge.setDistance(distance);
         edge.setFlags(edgeFlags);
@@ -386,13 +400,33 @@ public class OSMPostgisReader extends PostgisReader {
         c.x = Helper.round6(c.x);
         c.y = Helper.round6(c.y);
 
-        if (!Double.isNaN(c.z))
+        if (!Double.isNaN(c.z)) {
             c.z = Helper.round6(c.z);
+        }
 
         return c;
     }
 
     public void addListener(EdgeAddedListener l) {
         edgeAddedListeners.add(l);
+    }
+}
+
+class WayNodes {
+
+    private int fromNode;
+    private int toNode;
+
+    WayNodes(int fromNode, int toNode) {
+        this.fromNode = fromNode;
+        this.toNode = toNode;
+    }
+
+    public int getFromNode() {
+        return fromNode;
+    }
+
+    public int getToNode() {
+        return toNode;
     }
 }
